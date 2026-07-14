@@ -1188,9 +1188,8 @@
         formData.append('language', language.value);
         formData.append('mode', mode);
 
-        // All development and production servers use /api/transcribe paths
-        // (dev server uses -t public, production uses mod_rewrite)
-        const apiPath = '/api/transcribe';
+        // Use .php extension for development server compatibility
+        const apiPath = '/api/transcribe.php';
 
         const uploadRes = await fetch(apiPath, {
           method: 'POST',
@@ -1273,7 +1272,7 @@
 
       while (pollCount < maxPolls) {
         try {
-          const res = await fetch(`/api/transcribe?job_id=${jobId}`);
+          const res = await fetch(`/api/transcribe.php?job_id=${jobId}`);
           if (!res.ok) throw new Error('Poll failed');
 
           const data = await res.json();
@@ -1359,7 +1358,7 @@
 
       try {
         cancelButton.disabled = true;
-        const res = await fetch(`/api/transcribe?job_id=${currentJobId}`, {
+        const res = await fetch(`/api/transcribe.php?job_id=${currentJobId}`, {
           method: 'DELETE',
         });
 
