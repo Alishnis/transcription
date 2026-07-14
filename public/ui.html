@@ -1301,7 +1301,7 @@
 
             // Update status chips to "Готово"
             tableRow.querySelector('[data-status]').innerHTML = '<span class="status-chip">✓ Готово</span>';
-            mobileCard.querySelector('[data-status]') = 'done';
+            mobileCard.querySelector('[data-status]').innerHTML = '<span class="status-chip">✓ Готово</span>';
 
             // Enable download button
             const dlBtn = tableRow.querySelector('.row-download');
