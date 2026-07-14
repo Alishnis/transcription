@@ -1,0 +1,33 @@
+FROM php:8.2-alpine
+
+LABEL maintainer="Transcription Bot Team"
+
+# Install system dependencies for development
+RUN apk add --no-cache \
+    curl \
+    sqlite \
+    ffmpeg \
+    git \
+    vim \
+    && docker-php-ext-install pdo pdo_sqlite
+
+# Configure PHP for development
+RUN php -r "echo 'max_execution_time=3600'; echo PHP_EOL; echo 'memory_limit=512M'; echo PHP_EOL; echo 'upload_max_filesize=500M'; echo PHP_EOL; echo 'post_max_size=500M'; echo PHP_EOL; echo 'display_errors=1'; echo PHP_EOL; echo 'error_reporting=E_ALL';" > /usr/local/etc/php/conf.d/app.ini
+
+# Set working directory
+WORKDIR /app
+
+# Copy application code
+COPY . .
+
+# Create storage directories with permissions
+RUN mkdir -p storage/uploads storage/results && \
+    chmod 755 storage && \
+    chmod 755 storage/uploads && \
+    chmod 755 storage/results
+
+# Expose port for built-in server
+EXPOSE 8000
+
+# Run PHP built-in server
+CMD ["php", "-S", "0.0.0.0:8000", "-t", "public", "public/index.php"]

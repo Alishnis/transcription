@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: transcription-bot-app
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
+    environment:
+      - MODEL_API_URL=${MODEL_API_URL:-http://65.21.210.122:8017}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MANGISOZ_API_KEY=${MANGISOZ_API_KEY:-}
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: transcription-bot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./public:/app/public
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./storage:/app/storage
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: transcription-bot-worker
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
+    environment:
+      - MODEL_API_URL=${MODEL_API_URL:-http://65.21.210.122:8017}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MANGISOZ_API_KEY=${MANGISOZ_API_KEY:-}
+    command: tail -f /dev/null  # Keep running, worker.php invoked by API
+    restart: unless-stopped
+    depends_on:
+      - app
+
+volumes:
+  storage:

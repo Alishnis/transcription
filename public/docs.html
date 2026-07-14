@@ -1,0 +1,592 @@
+<title>Transcription API — Reference</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0B1120;
+    --surface:   #131D30;
+    --surface2:  #1A2640;
+    --border:    #1E2D47;
+    --text:      #CDD9F0;
+    --muted:     #6B8BB0;
+    --accent:    #E8B84B;
+    --accent-dim:#7A5F1A;
+    --get:       #3ECFB2;
+    --post:      #7B8CDE;
+    --err:       #E06C75;
+    --code-bg:   #080F1C;
+    --sidebar-w: 230px;
+    --header-h:  52px;
+  }
+
+  html { font-size: 15px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 24px;
+    z-index: 100;
+  }
+  .header-logo {
+    font-size: .72rem; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  .header-title {
+    font-size: .92rem; color: var(--muted);
+  }
+  .header-badge {
+    margin-left: auto;
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: .7rem; color: var(--muted);
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    padding-top: var(--header-h);
+    min-height: 100vh;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    position: sticky; top: var(--header-h);
+    height: calc(100vh - var(--header-h));
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    padding: 28px 0;
+    background: var(--surface);
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .nav-group { margin-bottom: 24px; }
+  .nav-label {
+    font-size: .65rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700;
+    padding: 0 20px 6px;
+  }
+  .nav-link {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 20px;
+    color: var(--text); text-decoration: none; font-size: .85rem;
+    border-left: 2px solid transparent;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .nav-link:hover { color: var(--accent); background: rgba(232,184,75,.04); }
+  .nav-link.active { color: var(--accent); border-left-color: var(--accent); }
+  .nav-method {
+    font-family: ui-monospace, monospace;
+    font-size: .65rem; font-weight: 700; letter-spacing: .03em;
+    padding: 1px 5px; border-radius: 3px;
+  }
+  .nm-post { background: rgba(123,140,222,.18); color: var(--post); }
+  .nm-get  { background: rgba(62,207,178,.15);  color: var(--get);  }
+
+  /* ── CONTENT ── */
+  .content {
+    max-width: 820px;
+    padding: 48px 56px 96px;
+  }
+
+  section { margin-bottom: 72px; }
+
+  h1 {
+    font-size: 1.9rem; font-weight: 700; letter-spacing: -.02em;
+    color: #EBF0FA; text-wrap: balance; line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-size: 1.25rem; font-weight: 600; color: #EBF0FA;
+    margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: .95rem; font-weight: 600; color: #EBF0FA; margin-bottom: 10px; }
+
+  p { color: var(--text); margin-bottom: 14px; font-size: .92rem; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ── ENDPOINT BLOCK ── */
+  .endpoint {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .endpoint-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .method-badge {
+    font-family: ui-monospace, monospace;
+    font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+    padding: 3px 9px; border-radius: 4px;
+  }
+  .mb-post { background: rgba(123,140,222,.22); color: var(--post); }
+  .mb-get  { background: rgba(62,207,178,.18);  color: var(--get);  }
+  .endpoint-path {
+    font-family: ui-monospace, monospace;
+    font-size: .88rem; color: var(--text);
+  }
+  .endpoint-desc {
+    font-size: .8rem; color: var(--muted); margin-left: auto;
+  }
+  .endpoint-body { padding: 20px; }
+
+  /* ── TABLES ── */
+  .table-wrap { overflow-x: auto; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  thead th {
+    text-align: left; padding: 8px 12px;
+    font-size: .7rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(30,45,71,.7); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  .td-name { font-family: ui-monospace, monospace; font-size: .82rem; color: var(--accent); }
+  .td-type { font-family: ui-monospace, monospace; font-size: .78rem; color: var(--muted); }
+  .td-req  { font-family: ui-monospace, monospace; font-size: .72rem; color: var(--err); }
+  .td-opt  { font-family: ui-monospace, monospace; font-size: .72rem; color: var(--muted); }
+
+  /* ── CODE ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 16px;
+  }
+  pre code {
+    display: block;
+    padding: 16px 18px;
+    font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+    font-size: .8rem;
+    line-height: 1.65;
+    color: #A9C0E0;
+  }
+  code {
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: .83em;
+    color: var(--accent);
+    background: rgba(232,184,75,.08);
+    padding: 1px 5px; border-radius: 3px;
+  }
+  pre code { background: none; color: inherit; padding: 0; border-radius: 0; font-size: .8rem; }
+
+  /* syntax colours */
+  .c-key  { color: #7B8CDE; }
+  .c-str  { color: #98C379; }
+  .c-num  { color: #E5C07B; }
+  .c-cmt  { color: #4B5E7A; font-style: italic; }
+  .c-url  { color: #3ECFB2; }
+
+  /* ── CALLOUT ── */
+  .callout {
+    display: flex; gap: 12px;
+    padding: 14px 16px;
+    border-radius: 6px;
+    border: 1px solid;
+    font-size: .85rem;
+    margin-bottom: 20px;
+  }
+  .callout-info  { background: rgba(62,207,178,.06); border-color: rgba(62,207,178,.25); color: #A0D8CE; }
+  .callout-warn  { background: rgba(232,184,75,.07); border-color: rgba(232,184,75,.28); color: #C9A94A; }
+  .callout-icon  { flex-shrink: 0; font-size: .9rem; }
+
+  /* ── STATUS CHIPS ── */
+  .chip {
+    display: inline-block;
+    font-family: ui-monospace, monospace;
+    font-size: .72rem; font-weight: 700;
+    padding: 2px 7px; border-radius: 3px; margin-right: 4px;
+  }
+  .chip-ok   { background: rgba(62,207,178,.15); color: var(--get); }
+  .chip-warn { background: rgba(232,184,75,.15); color: var(--accent); }
+  .chip-err  { background: rgba(224,108,117,.15); color: var(--err); }
+
+  /* ── BASE URL PILL ── */
+  .base-url {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 16px;
+    font-family: ui-monospace, monospace; font-size: .85rem;
+    color: var(--get); margin-bottom: 20px;
+  }
+  .base-url-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+
+  /* ── WORKFLOW STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
+  .step { display: flex; gap: 16px; }
+  .step-line { display: flex; flex-direction: column; align-items: center; }
+  .step-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--surface2); border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: .72rem; font-weight: 700; color: var(--accent);
+    flex-shrink: 0; font-variant-numeric: tabular-nums;
+  }
+  .step-connector { width: 2px; flex: 1; background: var(--border); margin: 4px 0; min-height: 16px; }
+  .step:last-child .step-connector { display: none; }
+  .step-content { padding: 2px 0 24px; }
+  .step-title { font-size: .88rem; font-weight: 600; color: #EBF0FA; margin-bottom: 6px; }
+  .step-body  { font-size: .83rem; color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .content { padding: 32px 20px 64px; }
+  }
+</style>
+
+<div class="header">
+  <span class="header-logo">Transcription</span>
+  <span class="header-title">API Reference</span>
+  <span class="header-badge">v1.0</span>
+</div>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="nav-group">
+      <div class="nav-label">Getting Started</div>
+      <a href="#overview" class="nav-link active">Overview</a>
+      <a href="#workflow" class="nav-link">Workflow</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Endpoints</div>
+      <a href="#post-transcribe" class="nav-link">
+        <span class="nav-method nm-post">POST</span> Create job
+      </a>
+      <a href="#get-transcribe" class="nav-link">
+        <span class="nav-method nm-get">GET</span> Job status
+      </a>
+      <a href="#get-download" class="nav-link">
+        <span class="nav-method nm-get">GET</span> Download result
+      </a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Reference</div>
+      <a href="#languages" class="nav-link">Languages</a>
+      <a href="#formats" class="nav-link">File formats</a>
+      <a href="#errors" class="nav-link">Error codes</a>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <h1>Transcription API</h1>
+      <p>Convert audio and video files to structured text. The API is asynchronous — you submit a file, receive a job ID, and poll until the result is ready.</p>
+
+      <div class="base-url">
+        <span class="base-url-label">Base URL</span>
+        http://localhost:8080
+      </div>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">ℹ</span>
+        <span>No authentication required. The API is intended for local or internal network use.</span>
+      </div>
+    </section>
+
+    <!-- WORKFLOW -->
+    <section id="workflow">
+      <h2>Workflow</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-line"><div class="step-dot">1</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Upload a file</div>
+            <div class="step-body">POST to <code>/api/transcribe.php</code> with your audio or video file and the desired language. Returns a <code>job_id</code> immediately.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-dot">2</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Poll for status</div>
+            <div class="step-body">GET <code>/api/transcribe.php?job_id=N</code> every 2–3 seconds. The <code>status</code> field moves from <code>processing</code> → <code>done</code> (or <code>failed</code>).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-line"><div class="step-dot">3</div><div class="step-connector"></div></div>
+          <div class="step-content">
+            <div class="step-title">Read the result</div>
+            <div class="step-body">When <code>status</code> is <code>done</code>, the response contains the full <code>text</code>, a <code>segments</code> array with timestamps, and download URLs for TXT, JSON, and PDF.</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Minimal example</h3>
+      <pre><code><span class="c-cmt"># 1. Upload</span>
+curl -X POST http://localhost:8080/api/transcribe.php \
+  -F <span class="c-str">"file=@meeting.mp3"</span> \
+  -F <span class="c-str">"language=ru"</span>
+
+<span class="c-cmt"># → {"job_id": 12, "status": "processing", "poll_url": "..."}</span>
+
+<span class="c-cmt"># 2. Poll</span>
+curl <span class="c-str">"http://localhost:8080/api/transcribe.php?job_id=12"</span>
+
+<span class="c-cmt"># 3. Download TXT when done</span>
+curl <span class="c-str">"http://localhost:8080/api/download.php?job_id=12&amp;type=txt"</span> -o result.txt</code></pre>
+    </section>
+
+    <!-- POST /api/transcribe.php -->
+    <section id="post-transcribe">
+      <h2>Create a transcription job</h2>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method-badge mb-post">POST</span>
+          <span class="endpoint-path">/api/transcribe.php</span>
+          <span class="endpoint-desc">multipart/form-data</span>
+        </div>
+        <div class="endpoint-body">
+          <h3>Request fields</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="td-name">file</td>
+                  <td class="td-type">file</td>
+                  <td class="td-req">required</td>
+                  <td>Audio or video file. See <a href="#formats" style="color:var(--accent)">supported formats</a>.</td>
+                </tr>
+                <tr>
+                  <td class="td-name">language</td>
+                  <td class="td-type">string</td>
+                  <td class="td-opt">optional</td>
+                  <td>Transcription language. One of <code>kz</code>, <code>ru</code>, <code>auto</code>. Defaults to <code>auto</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Response <span class="chip chip-ok">202</span></h3>
+          <pre><code>{
+  <span class="c-key">"job_id"</span>:   <span class="c-num">12</span>,
+  <span class="c-key">"status"</span>:   <span class="c-str">"processing"</span>,
+  <span class="c-key">"poll_url"</span>: <span class="c-str">"http://localhost:8080/api/transcribe.php?job_id=12"</span>
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- GET /api/transcribe.php -->
+    <section id="get-transcribe">
+      <h2>Get job status &amp; result</h2>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method-badge mb-get">GET</span>
+          <span class="endpoint-path">/api/transcribe.php?job_id={id}</span>
+        </div>
+        <div class="endpoint-body">
+          <h3>Query parameters</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Param</th><th>Type</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="td-name">job_id</td>
+                  <td class="td-type">integer</td>
+                  <td>ID returned by the POST endpoint.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Response while processing <span class="chip chip-warn">processing</span></h3>
+          <pre><code>{
+  <span class="c-key">"job_id"</span>:  <span class="c-num">12</span>,
+  <span class="c-key">"status"</span>:  <span class="c-str">"processing"</span>,
+  <span class="c-key">"message"</span>: <span class="c-str">"🧠 Часть 2/4: транскрибируем..."</span>
+}</code></pre>
+
+          <h3>Response when done <span class="chip chip-ok">done</span></h3>
+          <pre><code>{
+  <span class="c-key">"job_id"</span>:  <span class="c-num">12</span>,
+  <span class="c-key">"status"</span>:  <span class="c-str">"done"</span>,
+  <span class="c-key">"text"</span>:    <span class="c-str">"[00:00:00 - 00:00:22] Speaker 1: Текст транскрипции..."</span>,
+  <span class="c-key">"segments"</span>: [
+    {
+      <span class="c-key">"start"</span>:   <span class="c-str">"00:00:00.000"</span>,
+      <span class="c-key">"end"</span>:     <span class="c-str">"00:00:22.400"</span>,
+      <span class="c-key">"speaker"</span>: <span class="c-str">"Speaker 1"</span>,
+      <span class="c-key">"text"</span>:    <span class="c-str">"Текст транскрипции первого сегмента"</span>
+    }
+  ],
+  <span class="c-key">"downloads"</span>: {
+    <span class="c-key">"txt"</span>:  <span class="c-str">"http://localhost:8080/api/download.php?job_id=12&amp;type=txt"</span>,
+    <span class="c-key">"json"</span>: <span class="c-str">"http://localhost:8080/api/download.php?job_id=12&amp;type=json"</span>,
+    <span class="c-key">"pdf"</span>:  <span class="c-str">"http://localhost:8080/api/download.php?job_id=12&amp;type=pdf"</span>
+  }
+}</code></pre>
+
+          <div class="callout callout-warn">
+            <span class="callout-icon">⚠</span>
+            <span>The <code>pdf</code> key is only present when PDF generation succeeded. Always check before using.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GET /api/download.php -->
+    <section id="get-download">
+      <h2>Download result file</h2>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method-badge mb-get">GET</span>
+          <span class="endpoint-path">/api/download.php?job_id={id}&amp;type={type}</span>
+        </div>
+        <div class="endpoint-body">
+          <h3>Query parameters</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Param</th><th>Type</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="td-name">job_id</td>
+                  <td class="td-type">integer</td>
+                  <td>Job ID.</td>
+                </tr>
+                <tr>
+                  <td class="td-name">type</td>
+                  <td class="td-type">string</td>
+                  <td>One of <code>txt</code>, <code>json</code>, <code>pdf</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Returns the file with the appropriate <code>Content-Type</code> header and a <code>Content-Disposition: attachment</code> prompt.</p>
+          <pre><code>curl <span class="c-str">"http://localhost:8080/api/download.php?job_id=12&amp;type=pdf"</span> \
+  -o transcript.pdf</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- LANGUAGES -->
+    <section id="languages">
+      <h2>Languages</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Value</th><th>Language</th><th>Engine</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="td-name">kz</td>
+              <td>Kazakh</td>
+              <td>Mangisoz STT</td>
+            </tr>
+            <tr>
+              <td class="td-name">ru</td>
+              <td>Russian</td>
+              <td>Mangisoz STT</td>
+            </tr>
+            <tr>
+              <td class="td-name">auto</td>
+              <td>Auto-detect</td>
+              <td>Google Gemini</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>For <code>kz</code> and <code>ru</code>, long files are automatically split into 20-second chunks to prevent word loss at Mangisoz's internal segment boundaries.</p>
+    </section>
+
+    <!-- FILE FORMATS -->
+    <section id="formats">
+      <h2>File formats</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Type</th><th>Extensions</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Audio</td>
+              <td class="td-type">mp3 &nbsp;wav &nbsp;m4a &nbsp;aac &nbsp;ogg &nbsp;oga &nbsp;opus</td>
+            </tr>
+            <tr>
+              <td>Video</td>
+              <td class="td-type">mp4 &nbsp;mov</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Video files are automatically converted to audio before transcription. The extracted audio is also returned as a separate download.</p>
+    </section>
+
+    <!-- ERRORS -->
+    <section id="errors">
+      <h2>Error codes</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>HTTP</th><th>Condition</th><th>Body</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="td-type" style="font-variant-numeric:tabular-nums">400</td>
+              <td>Missing or invalid field</td>
+              <td class="td-type"><code>{"error": "No file uploaded"}</code></td>
+            </tr>
+            <tr>
+              <td class="td-type" style="font-variant-numeric:tabular-nums">404</td>
+              <td>Job ID not found</td>
+              <td class="td-type"><code>{"error": "Job not found"}</code></td>
+            </tr>
+            <tr>
+              <td class="td-type" style="font-variant-numeric:tabular-nums">405</td>
+              <td>Wrong HTTP method</td>
+              <td class="td-type"><code>{"error": "Method not allowed"}</code></td>
+            </tr>
+            <tr>
+              <td class="td-type" style="font-variant-numeric:tabular-nums">415</td>
+              <td>Unsupported file type</td>
+              <td class="td-type"><code>{"error": "Unsupported file type: xyz"}</code></td>
+            </tr>
+            <tr>
+              <td class="td-type" style="font-variant-numeric:tabular-nums">500</td>
+              <td>Transcription failed</td>
+              <td class="td-type"><code>{"error": "...", "status": "failed"}</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>All error responses are JSON with a top-level <code>error</code> string describing what went wrong.</p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Highlight active nav link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const links    = document.querySelectorAll('.nav-link');
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: `-${52}px 0px -60% 0px` });
+
+  sections.forEach(s => obs.observe(s));
+</script>

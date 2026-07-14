@@ -1,0 +1,23 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Don't rewrite real files/directories
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # API routes: /api/transcribe -> /api/transcribe.php
+    RewriteRule ^api/(\w+)/?$ api/$1.php [L,QSA]
+
+    # Everything else to index.html (for SPA routing if needed)
+    RewriteRule ^(?!api/).*$ index.html [L]
+</IfModule>
+
+<IfModule mod_php.c>
+    AddType application/x-httpd-php .php
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options: nosniff
+</IfModule>

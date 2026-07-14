@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: transcription-bot-dev
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
+    environment:
+      - PHP_IDE_CONFIG=serverName=localhost
+      - MODEL_API_URL=${MODEL_API_URL:-http://65.21.210.122:8017}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MANGISOZ_API_KEY=${MANGISOZ_API_KEY:-}
+    ports:
+      - "8000:8000"
+    command: php -S 0.0.0.0:8000 -t public public/index.php
+    restart: unless-stopped
+
+volumes:
+  storage:
