@@ -1300,17 +1300,28 @@
             resultCheck.style.color = 'var(--success)';
 
             // Update status chips to "Готово"
-            tableRow.querySelector('[data-status]').innerHTML = '<span class="status-chip">✓ Готово</span>';
-            mobileCard.querySelector('[data-status]').innerHTML = '<span class="status-chip">✓ Готово</span>';
+            const statusChipTable = tableRow.querySelector('[data-status]');
+            if (statusChipTable) {
+              statusChipTable.innerHTML = '<span class="status-chip">✓ Готово</span>';
+            }
+
+            const statusChipMobile = mobileCard.querySelector('[data-status]');
+            if (statusChipMobile) {
+              statusChipMobile.innerHTML = '<span class="status-chip">✓ Готово</span>';
+            }
 
             // Enable download button
             const dlBtn = tableRow.querySelector('.row-download');
-            dlBtn.disabled = false;
-            dlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
+            if (dlBtn) {
+              dlBtn.disabled = false;
+              dlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
+            }
 
             const mobileDlBtn = mobileCard.querySelector('.row-download');
-            mobileDlBtn.disabled = false;
-            mobileDlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
+            if (mobileDlBtn) {
+              mobileDlBtn.disabled = false;
+              mobileDlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
+            }
             break;
           }
 
