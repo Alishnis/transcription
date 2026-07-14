@@ -4,10 +4,22 @@ Modern web interface for audio/video transcription with speaker diarization and 
 
 ## Quick Start
 
-### 1. Setup Environment
+### 1. First Time Setup
+
+**Complete setup guide:** See [FIRST_SETUP.md](FIRST_SETUP.md)
+
+Quick start:
 ```bash
+git clone https://github.com/Alishnis/transcription.git
+cd transcription
+
+# Setup environment
 cp .env.example .env
-# Edit .env and set MODEL_API_URL or GEMINI_API_KEY
+# Edit .env and add API keys (see FIRST_SETUP.md)
+
+# Create storage directories
+mkdir -p storage/uploads storage/results
+chmod 755 storage storage/uploads storage/results
 ```
 
 ### 2. Run Development Server
