@@ -63,7 +63,7 @@
 2. **Set API URL** (default uses internal gateway):
    ```bash
    MODEL_API_URL=http://65.21.210.122:8017
-   MANGISOZ_API_KEY=your_key_here
+   # or set GEMINI_API_KEY for direct Google Gemini API access
    ```
 
 3. **Create storage directories** (created automatically on first run):

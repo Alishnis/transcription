@@ -21,6 +21,12 @@ if (strpos($uri, '/api/download') === 0) {
     exit;
 }
 
+// Route /api/history to /api/history.php
+if ($uri === '/api/history') {
+    require __DIR__ . '/api/history.php';
+    exit;
+}
+
 // Route /api/status to /api/status.php
 if ($uri === '/api/status') {
     require __DIR__ . '/api/status.php';

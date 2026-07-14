@@ -59,7 +59,7 @@ php worker.php <job_id>
 
 Requires `.env` file with:
 - `MODEL_API_URL` — internal Model API gateway (default: http://65.21.210.122:8017)
-- `MANGISOZ_API_KEY` — Mangisoz API key (for kz/ru transcription)
+- `GEMINI_API_KEY` — optional Gemini API key (if using direct API instead of gateway)
 
 PHP extensions: `pdo_sqlite`, `curl`.
 
@@ -71,10 +71,9 @@ No framework, no Composer — plain PHP with cURL. Key classes:
 
 - **`src/Transcriber.php`** — orchestrates pipeline: upload → transcribe → postprocess → save results → diarize
 - **`src/ModelApi.php`** — Gemini API client. Handles two-step resumable file upload, then `generateContent` with JSON output. Retries on malformed JSON.
-- **`src/MangisozApi.php`** — Mangisoz API client for Kazakh/Russian (alternate to ModelAPI)
 - **`src/Database.php`** — SQLite via PDO. Tables: `jobs` (tracks job lifecycle), `user_states` (reserved for future)
 - **`src/PdfGenerator.php`** — generates PDF with formatted transcription, speaker labels, timestamps
-- **`src/RecreateApi.php`** — utility for audio chunking and format conversion (used in test lab)
+- **`src/RecreateApi.php`** — utility for audio chunking and format conversion
 
 ### Transcription pipeline
 

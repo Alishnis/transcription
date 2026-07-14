@@ -76,7 +76,6 @@
 
 - [ ] Model API URL configured and accessible
 - [ ] GEMINI_API_KEY or MODEL_API_URL working
-- [ ] MANGISOZ_API_KEY configured (if used)
 - [ ] API timeouts appropriate for large files
 - [ ] Error responses properly formatted
 

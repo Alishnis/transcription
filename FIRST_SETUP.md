@@ -18,9 +18,6 @@ nano .env  # или другой редактор
 # Gemini API (опционально - если не используете Model API)
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Mangisoz API (для казахского/русского)
-MANGISOZ_API_KEY=your_mangisoz_api_key_here
-
 # Model API Gateway (обычно используется)
 MODEL_API_URL=http://65.21.210.122:8017
 
@@ -144,17 +141,6 @@ MODEL_API_URL=  # оставить пустым или удалить
 2. Создать новый API key
 3. Вставить в GEMINI_API_KEY
 
-### Вариант C: Использовать Mangisoz (для казахского/русского)
-
-```env
-# В .env добавить ключ Mangisoz:
-MANGISOZ_API_KEY=your_mangisoz_api_key
-
-# Остальные параметры для автоматического выбора
-MODEL_API_URL=http://65.21.210.122:8017
-GEMINI_API_KEY=  # опционально
-```
-
 ## 7. Запуск на новом устройстве
 
 ### Вариант 1: Встроенный PHP сервер (быстрый старт)
@@ -232,8 +218,7 @@ chmod 755 storage storage/uploads storage/results
 # Проверить интернет соединение
 curl http://65.21.210.122:8017/health
 
-# Если 429 - истекла квота
-# Подождать или использовать GEMINI_API_KEY
+# Если 429 - истекла квота, используйте GEMINI_API_KEY
 ```
 
 ### Ошибка: "Extension pdo_sqlite not loaded"

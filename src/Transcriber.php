@@ -11,7 +11,6 @@ class Transcriber
     public function __construct(
         private ModelApi     $model,
         private Database     $db,
-        private MangisozApi  $mangisoz,
         private RecreateApi  $recreate,
         private PdfGenerator $pdf = new PdfGenerator(),
     ) {}
@@ -75,7 +74,7 @@ class Transcriber
                 $this->status('☁️ Загружаем аудио в облако...');
                 $fileUrl = $this->recreate->uploadFileByUrl($extractedUrl);
 
-                // Download extracted audio locally (for Mangisoz direct calls)
+                // Download extracted audio locally for processing
                 $audioPath = STORAGE_PATH . '/uploads/job_' . $jobId . '_audio.mp3';
                 $bytes     = file_get_contents($extractedUrl);
                 if ($bytes === false) {
@@ -98,70 +97,25 @@ class Transcriber
                 $duration = $this->estimateDuration($filePath, $ext);
             }
 
-            // Engine: for kz/ru the user chooses Mangisoz (default) or Gemini;
-            // auto always goes to the Model API gateway (Gemini).
-            // Mangisoz internally segments at ~28 s — keep chunks shorter to avoid word loss.
-            $engine      = $job['engine'] ?? 'mangisoz';
-            $useMangisoz = in_array($language, ['kz', 'ru'], true) && $engine !== 'gemini';
-            $effectiveChunkDuration = $useMangisoz ? CHUNK_DURATION_KZ : CHUNK_DURATION;
-
-            // The gateway accepts files only by public URL — publish local-only
+            // Gateway accepts files only by public URL — publish local-only
             // files (web uploads) via Recreate before transcription.
-            if (!$useMangisoz && $fileUrl === null && $filePath !== '' && file_exists($filePath)) {
+            if ($fileUrl === null && $filePath !== '' && file_exists($filePath)) {
                 $this->status('☁️ Загружаем файл в облако...');
                 [$fileUrl, $ext, $mimeType, $realDuration] = $this->publishLocalAudio($jobId, $filePath, $ext, $mimeType);
-                // The publish step reports the true duration — always better than
-                // the file-size estimate, which skews chunk boundaries
                 if ($realDuration > 0) {
                     $duration = (int)ceil($realDuration);
                 }
             }
 
-            // For Mangisoz web uploads (no public URL): chunk locally via afconvert + WAV split.
-            $useLocalChunks = $useMangisoz
-                && $fileUrl === null
-                && $filePath !== ''
-                && file_exists($filePath)
-                && $duration > CHUNK_DURATION_KZ;
+            $useChunks = $duration > CHUNK_DURATION && $fileUrl !== null;
 
-            $useChunks = $duration > $effectiveChunkDuration && $fileUrl !== null;
-
-            if ($useLocalChunks) {
-                $total = (int)ceil($duration / CHUNK_DURATION_KZ);
-                $this->status("🧠 Транскрибация (Mangisoz): {$total} " . $this->pluralPart($total) . "...");
-                $this->db->updateJob($jobId, ['status' => 'transcribing']);
-                $this->setProgress(20);
-                $segments = $this->transcribeLocalChunkedKz($jobId, $filePath, $mimeType, $duration, $language);
-            } elseif ($useChunks) {
+            if ($useChunks) {
                 $stableUrl   = $fileUrl;
-                $totalChunks = (int)ceil($duration / $effectiveChunkDuration);
-                $label       = $useMangisoz ? 'Mangisoz' : 'Gemini';
-                $this->status("🧠 Транскрибация ({$label}): {$totalChunks} " . $this->pluralPart($totalChunks) . "...");
+                $totalChunks = (int)ceil($duration / CHUNK_DURATION);
+                $this->status("🧠 Транскрибация: {$totalChunks} " . $this->pluralPart($totalChunks) . "...");
                 $this->db->updateJob($jobId, ['status' => 'transcribing']);
                 $this->setProgress(20);
-                $segments = $this->transcribeChunked($jobId, $stableUrl, $ext, $mimeType, $language, $duration, $effectiveChunkDuration, $useMangisoz);
-            } elseif ($useMangisoz) {
-                $this->status('🧠 Делаем транскрибацию (Mangisoz)... Это может занять несколько минут.');
-                $this->db->updateJob($jobId, ['status' => 'transcribing']);
-                $this->setProgress(20);
-                $segments = $this->mangisoz->transcribe($filePath, $mimeType, $language);
-
-                // Mangisoz's STT carries no speaker info — ask Gemini separately.
-                // Diarization needs a public URL; publish one if we don't have it yet.
-                $diarizeUrl  = $fileUrl;
-                $diarizeMime = $mimeType;
-                if ($diarizeUrl === null) {
-                    try {
-                        [$diarizeUrl, , $diarizeMime] = $this->publishLocalAudio($jobId, $filePath, $ext, $mimeType);
-                    } catch (Throwable $e) {
-                        error_log("[Job {$jobId}] diarization publish skipped: " . $e->getMessage());
-                    }
-                }
-                if ($diarizeUrl !== null) {
-                    $this->status('🗣️ Определяем спикеров...');
-                    $turns    = $this->diarizeSafely($diarizeUrl, $diarizeMime);
-                    $segments = $this->assignSpeakersByOverlap($segments, $turns);
-                }
+                $segments = $this->transcribeChunked($jobId, $stableUrl, $ext, $mimeType, $language, $duration, CHUNK_DURATION);
             } else {
                 $this->db->updateJob($jobId, ['status' => 'transcribing']);
                 $this->status('🧠 Делаем транскрибацию... Это может занять несколько минут.');
@@ -227,17 +181,15 @@ class Transcriber
         string $mimeType,
         string $language,
         int    $duration,
-        int    $chunkDuration = CHUNK_DURATION,
-        bool   $useMangisoz = false
+        int    $chunkDuration = CHUNK_DURATION
     ): array {
         $total       = (int)ceil($duration / $chunkDuration);
         $all         = [];
         $chunkNum    = 0;
         $prevChunkOk = true; // whether the immediately preceding chunk actually produced segments
 
-        // Neither engine's per-chunk speaker labels are trustworthy across
-        // chunk boundaries: Mangisoz has no speaker info at all, and even the
-        // Model API/Gemini path numbers speakers fresh within each isolated
+        // Per-chunk speaker labels are not trustworthy across
+        // chunk boundaries: Gemini numbers speakers fresh within each isolated
         // chunk ("Speaker 1" = whichever voice it hears first in THAT slice),
         // so a turn split across a chunk seam can flip identities for the
         // rest of the chunk. Prefer ONE diarization pass over the whole file:
@@ -274,24 +226,7 @@ class Transcriber
             $segments = null;
             for ($attempt = 1; $attempt <= 3; $attempt++) {
                 try {
-                    if ($useMangisoz) {
-                        // Mangisoz needs the file bytes — download the chunk locally
-                        $chunkPath = STORAGE_PATH . "/uploads/chunk_{$jobId}_{$chunkNum}.{$ext}";
-                        $bytes     = file_get_contents($chunkUrl);
-                        if ($bytes === false) {
-                            throw new RuntimeException("Не удалось скачать chunk {$chunkNum}: {$chunkUrl}");
-                        }
-                        file_put_contents($chunkPath, $bytes);
-
-                        try {
-                            $segments = $this->mangisoz->transcribe($chunkPath, $mimeType, $language);
-                        } finally {
-                            @unlink($chunkPath);
-                        }
-                    } else {
-                        // The Model API gateway consumes the chunk directly by URL
-                        $segments = $this->model->transcribeUrl($chunkUrl, $mimeType, $language);
-                    }
+                    $segments = $this->model->transcribeUrl($chunkUrl, $mimeType, $language);
                     break;
                 } catch (Throwable $e) {
                     error_log("[Job {$jobId}] chunk {$chunkNum}/{$total} attempt {$attempt} failed: " . $e->getMessage());
@@ -388,296 +323,7 @@ class Transcriber
     }
 
     // -------------------------------------------------------------------------
-    // Local chunking for kz web uploads (no public URL available)
-
-    /**
-     * Convert audio to WAV via afconvert, split into CHUNK_DURATION_KZ-second chunks
-     * in pure PHP, transcribe each chunk with Mangisoz, and merge the results.
-     * Falls back to single-file transcription if afconvert is unavailable.
-     */
-    private function transcribeLocalChunkedKz(
-        int    $jobId,
-        string $filePath,
-        string $mimeType,
-        int    $duration,
-        string $language = 'kz'
-    ): array {
-        $wavPath = STORAGE_PATH . '/uploads/job_' . $jobId . '_tmp.wav';
-
-        // Convert to 16-bit PCM WAV (afconvert is available on macOS)
-        $cmd    = 'afconvert -f WAVE -d LEI16 ' . escapeshellarg($filePath) . ' ' . escapeshellarg($wavPath) . ' 2>&1';
-        $out    = [];
-        $code   = 0;
-        exec($cmd, $out, $code);
-
-        if ($code !== 0 || !file_exists($wavPath)) {
-            error_log("[Job {$jobId}] afconvert failed (code {$code}): " . implode(' ', $out) . ' — falling back to single-file transcription');
-            return $this->mangisoz->transcribe($filePath, $mimeType, $language);
-        }
-
-        // Prefer diarizing the whole file in one Gemini pass — far more
-        // reliable than isolated per-chunk calls (see transcribeChunked).
-        // Diarization output is just turn boundaries, so it stays cheap even
-        // for long recordings — only fall back to per-chunk diarization when
-        // the whole-file pass genuinely fails.
-        $wholeFileTurns = null;
-        if ($duration <= 5400) {
-            $this->status('🗣️ Определяем спикеров...');
-            $diarizeUrl = $this->publishForDiarization($filePath);
-            if ($diarizeUrl !== null) {
-                $turns = $this->diarizeSafely($diarizeUrl, $mimeType);
-                if (!empty($turns)) {
-                    $wholeFileTurns = $turns;
-                }
-            }
-        }
-
-        $wavInfo = $this->parseWavHeader($wavPath);
-        if ($wavInfo === null) {
-            @unlink($wavPath);
-            $segments = $this->mangisoz->transcribe($filePath, $mimeType, $language);
-            return $wholeFileTurns !== null
-                ? $this->assignSpeakersByOverlap($segments, $wholeFileTurns)
-                : $segments;
-        }
-
-        $total       = (int)ceil($duration / CHUNK_DURATION_KZ);
-        $all         = [];
-        $chunkNum    = 0;
-        $prevChunkOk = true; // whether the immediately preceding chunk actually produced segments
-
-        for ($start = 0; $start < $duration; $start += CHUNK_DURATION_KZ) {
-            $chunkNum++;
-            $end       = min($start + CHUNK_DURATION_KZ + CHUNK_OVERLAP, $duration);
-            $wavChunkPath = STORAGE_PATH . '/uploads/chunk_' . $jobId . '_' . $chunkNum . '.wav';
-            $m4aChunkPath = STORAGE_PATH . '/uploads/chunk_' . $jobId . '_' . $chunkNum . '.m4a';
-
-            $this->status("🧠 Часть {$chunkNum}/{$total}: транскрибируем...");
-            $this->extractWavChunk($wavPath, $wavChunkPath, $wavInfo, $start, $end);
-
-            // Skip empty chunks (can happen at EOF)
-            if (!file_exists($wavChunkPath) || filesize($wavChunkPath) < 1000) {
-                @unlink($wavChunkPath);
-                $prevChunkOk = false;
-                continue;
-            }
-
-            // Convert WAV chunk to M4A (AAC) — more compatible than raw WAV
-            $convOut  = [];
-            $convCode = 0;
-            exec('afconvert -f m4af -d aac ' . escapeshellarg($wavChunkPath) . ' ' . escapeshellarg($m4aChunkPath) . ' 2>&1', $convOut, $convCode);
-            @unlink($wavChunkPath);
-
-            if ($convCode === 0 && file_exists($m4aChunkPath)) {
-                $chunkPath = $m4aChunkPath;
-                $chunkMime = 'audio/mp4';
-            } else {
-                error_log("[Job {$jobId}] afconvert m4a failed (code {$convCode}): " . implode(' ', $convOut));
-                $this->extractWavChunk($wavPath, $wavChunkPath, $wavInfo, $start, $end);
-                $chunkPath = $wavChunkPath;
-                $chunkMime = 'audio/wav';
-            }
-
-            // Pause between requests — Mangisoz backend can 502 on rapid consecutive calls
-            if ($chunkNum > 1) sleep(2);
-
-            $segments = null;
-            for ($attempt = 1; $attempt <= 3; $attempt++) {
-                try {
-                    $segments = $this->mangisoz->transcribe($chunkPath, $chunkMime, $language);
-                    break;
-                } catch (Throwable $e) {
-                    error_log("[Job {$jobId}] chunk {$chunkNum}/{$total} attempt {$attempt} failed: " . $e->getMessage());
-                    if ($attempt < 3) {
-                        $this->status("⏳ Часть {$chunkNum}/{$total}: сбой, повторяем ({$attempt}/3)...");
-                        sleep(5);
-                    }
-                }
-            }
-
-            // Only diarize this chunk individually when the whole-file pass
-            // wasn't attempted or came back empty (long file, transient failure)
-            $turns = [];
-            if ($segments !== null && $wholeFileTurns === null) {
-                $diarizeUrl = $this->publishForDiarization($chunkPath);
-                if ($diarizeUrl !== null) {
-                    $turns = $this->diarizeSafely($diarizeUrl, 'audio/mpeg');
-                }
-            }
-            @unlink($chunkPath);
-
-            if ($segments === null) {
-                $this->failedChunks[] = $chunkNum;
-                $prevChunkOk = false; // no tail was captured — the next chunk must not assume overlap coverage
-                continue; // give up on this chunk, keep transcribing the rest
-            }
-
-            if ($wholeFileTurns === null) {
-                $segments = $this->assignSpeakersByOverlap($segments, $turns);
-            }
-            $hasOverlap = $chunkNum > 1 && $prevChunkOk;
-
-            // See transcribeChunked() — use actual captured coverage, not the
-            // nominal overlap window, so a short-stopped previous chunk can't
-            // cause real speech near the seam to be dropped by both chunks.
-            $prevCoverageEnd = empty($all) ? 0.0 : $this->tsToSecs(end($all)['end']);
-
-            foreach ($segments as $seg) {
-                $segStartRel = $this->tsToSecs($seg['start'] ?? '00:00:00.000');
-                $segEndRel   = $this->tsToSecs($seg['end']   ?? '00:00:00.000');
-
-                $absStart = $start + $segStartRel;
-                $absEnd   = $start + $segEndRel;
-
-                if ($hasOverlap && $absEnd <= $prevCoverageEnd) continue;
-
-                $text = trim($seg['text'] ?? '');
-
-                if ($hasOverlap && $segStartRel < CHUNK_OVERLAP + 8) {
-                    $text = $this->removeLeadingDuplicates($all, $text);
-                    if ($absStart < $prevCoverageEnd) {
-                        $absStart = $prevCoverageEnd;
-                    }
-                }
-
-                if ($text === '') continue;
-
-                $all[] = [
-                    'start'   => $this->secsToTs($absStart),
-                    'end'     => $this->secsToTs($absEnd),
-                    'speaker' => $seg['speaker'] ?? 'Speaker 1',
-                    'gender'  => $seg['gender'] ?? null,
-                    'text'    => $text,
-                ];
-            }
-
-            $prevChunkOk = true;
-        }
-
-        @unlink($wavPath);
-
-        // If we have whole-file diarization, apply it BEFORE merging so that
-        // adjacent same-speaker segments (which had per-chunk labels) can be
-        // properly merged. Otherwise merging can't combine a segment labeled
-        // "Speaker 1" (from chunk 1) with "Speaker 2" (from chunk 2), even
-        // if they're actually the same voice per whole-file diarization.
-        if ($wholeFileTurns !== null) {
-            $all = $this->assignSpeakersByOverlap($all, $wholeFileTurns);
-        }
-
-        $merged = $this->mergeAdjacentSegments($all);
-        return $merged;
-    }
-
-    /** Parse WAV RIFF header; returns null on failure. */
-    private function parseWavHeader(string $wavPath): ?array
-    {
-        $fp = fopen($wavPath, 'rb');
-        if (!$fp) return null;
-
-        if (fread($fp, 4) !== 'RIFF') { fclose($fp); return null; }
-        fread($fp, 4); // file size
-        if (fread($fp, 4) !== 'WAVE') { fclose($fp); return null; }
-
-        $sampleRate = $channels = $bitsPerSample = $dataOffset = $dataSize = 0;
-
-        while (!feof($fp)) {
-            $id  = fread($fp, 4);
-            $raw = fread($fp, 4);
-            if (strlen($id) < 4 || strlen($raw) < 4) break;
-            $sz = unpack('V', $raw)[1];
-
-            if ($id === 'fmt ') {
-                fread($fp, 2); // audio format
-                $channels      = unpack('v', fread($fp, 2))[1];
-                $sampleRate    = unpack('V', fread($fp, 4))[1];
-                fread($fp, 4); // byte rate
-                fread($fp, 2); // block align
-                $bitsPerSample = unpack('v', fread($fp, 2))[1];
-                $extra = $sz - 16;
-                if ($extra > 0) fread($fp, $extra);
-            } elseif ($id === 'data') {
-                $dataOffset = ftell($fp);
-                $dataSize   = $sz;
-                break;
-            } else {
-                $skip = $sz + ($sz % 2);
-                if ($skip > 0) fread($fp, $skip);
-            }
-        }
-        fclose($fp);
-
-        if (!$sampleRate || !$dataOffset) return null;
-
-        return [
-            'sampleRate'    => $sampleRate,
-            'channels'      => $channels,
-            'bitsPerSample' => $bitsPerSample,
-            'dataOffset'    => $dataOffset,
-            'dataSize'      => $dataSize,
-            'bytesPerSec'   => $sampleRate * $channels * intdiv($bitsPerSample, 8),
-        ];
-    }
-
-    /** Write a slice of a WAV file's PCM data as a new valid WAV file. */
-    private function extractWavChunk(string $src, string $dst, array $info, int $startSec, int $endSec): void
-    {
-        $bps       = $info['bytesPerSec'];
-        $startByte = (int)($startSec * $bps);
-        $endByte   = min((int)($endSec * $bps), $info['dataSize']);
-        $pcmLen    = max(0, $endByte - $startByte);
-
-        $in = fopen($src, 'rb');
-        fseek($in, $info['dataOffset'] + $startByte);
-        $pcm = $pcmLen > 0 ? fread($in, $pcmLen) : '';
-        fclose($in);
-
-        $blockAlign = $info['channels'] * intdiv($info['bitsPerSample'], 8);
-
-        $out = fopen($dst, 'wb');
-        fwrite($out, 'RIFF');
-        fwrite($out, pack('V', 36 + $pcmLen));
-        fwrite($out, 'WAVE');
-        fwrite($out, 'fmt ');
-        fwrite($out, pack('V', 16));
-        fwrite($out, pack('v', 1));                        // PCM
-        fwrite($out, pack('v', $info['channels']));
-        fwrite($out, pack('V', $info['sampleRate']));
-        fwrite($out, pack('V', $bps));
-        fwrite($out, pack('v', $blockAlign));
-        fwrite($out, pack('v', $info['bitsPerSample']));
-        fwrite($out, 'data');
-        fwrite($out, pack('V', $pcmLen));
-        fwrite($out, $pcm);
-        fclose($out);
-    }
-
-    /**
-     * Translate Kazakh segments to Russian, then ask Gemini to add punctuation
-     * to the Kazakh text using the Russian translation as a reference.
-     */
-    private function punctuateSegments(array $segments): array
-    {
-        if (empty($segments)) return $segments;
-
-        $sep   = ' ||| ';
-        $texts = array_map(fn($s) => $s['text'] ?? '', $segments);
-        $kk    = implode($sep, $texts);
-
-        // Translate kk → ru (Mangisoz), then use the Model API gateway to add punctuation
-        $ru          = $this->mangisoz->translate($kk);
-        $punctuated  = $this->model->addPunctuation($kk, $ru);
-
-        $parts = array_map('trim', explode('|||', $punctuated));
-
-        foreach ($segments as $i => &$seg) {
-            if (isset($parts[$i]) && $parts[$i] !== '') {
-                $seg['text'] = $parts[$i];
-            }
-        }
-
-        return $segments;
-    }
+    // Helper methods
 
     /**
      * Pull just the audio track out of a (possibly huge) local video file and
@@ -753,7 +399,7 @@ class Transcriber
      * Remove words from the beginning of $text that already appear at the end
      * of the previously collected segments (overlap deduplication).
      *
-     * Mangisoz returns ~28-second segments that often straddle chunk boundaries.
+     * Transcription models often return segments that straddle chunk boundaries.
      * We compare the leading words of the new segment against the trailing words
      * of the accumulated text and strip any common prefix.
      */
@@ -787,7 +433,7 @@ class Transcriber
             }
         }
 
-        // 2. Inline match: Mangisoz sometimes prepends overlap context before the duplicate.
+        // 2. Inline match: transcription models sometimes prepend overlap context before the duplicate.
         //    Find the longest suffix of prevWords that appears anywhere inside segWords,
         //    then strip everything up to and including that match.
         $segLower = array_map($norm, $segWords);
@@ -965,8 +611,7 @@ class Transcriber
     }
 
     /**
-     * Mangisoz's STT output carries no speaker information at all — this asks
-     * Gemini to identify speaker turns separately and never lets a failure
+     * Ask Gemini to identify speaker turns and never let a failure
      * here break transcription: on any error/timeout/bad JSON it returns [],
      * and callers fall back to the previous single-speaker behavior.
      */

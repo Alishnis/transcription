@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class Database
 {
-    private PDO $pdo;
+    public PDO $pdo;
 
     public function __construct(string $path)
     {
@@ -58,10 +58,6 @@ class Database
         }
         if (!in_array('summary', $existing, true)) {
             $this->pdo->exec("ALTER TABLE jobs ADD COLUMN summary TEXT");
-        }
-        if (!in_array('engine', $existing, true)) {
-            // Transcription engine for kz/ru: 'mangisoz' (default) or 'gemini'
-            $this->pdo->exec("ALTER TABLE jobs ADD COLUMN engine TEXT NOT NULL DEFAULT 'mangisoz'");
         }
         if (!in_array('progress', $existing, true)) {
             // Progress percentage (0-100)

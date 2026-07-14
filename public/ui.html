@@ -1379,6 +1379,93 @@
         cancelButton.disabled = false;
       }
     });
+
+    // Load processing history on page load
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/history');
+        if (!res.ok) throw new Error('Failed to load history');
+
+        const data = await res.json();
+        if (!data.history || data.history.length === 0) return;
+
+        // Clear existing dummy rows
+        historyBody.innerHTML = '';
+        mobileHistory.innerHTML = '';
+
+        data.history.forEach(job => {
+          // Get file extension from path or determine from mode
+          const iconHtml = job.language === 'auto' ? iconAudio : iconAudio; // Default to audio
+          const statusChip = `<span class="status-chip" data-status="${job.status}">${
+            job.status === 'done' ? '✓ Готово' :
+            job.status === 'processing' ? 'Обработка…' :
+            job.status === 'failed' ? '✗ Ошибка' :
+            'Загружено'
+          }</span>`;
+
+          const modeLabel = job.mode === 'summary' ? 'Краткое содержание' :
+                           job.mode === 'speakers' ? 'Текст по спикерам' : 'Точный текст';
+
+          // Desktop table row
+          const row = document.createElement('tr');
+          row.setAttribute('data-job-id', job.id);
+          row.innerHTML = `
+            <td>
+              <div class="history-file">
+                <div class="mini-file-icon">${iconAudio}</div>
+                <div><div class="history-file-name">Job #${job.id}</div><div class="history-file-meta">${job.duration}s · ${job.mode}</div></div>
+              </div>
+            </td>
+            <td><span class="type-chip">${modeLabel}</span></td>
+            <td>${job.language === 'auto' ? 'Авто' : job.language.toUpperCase()}</td>
+            <td>${job.time_ago}</td>
+            <td>${statusChip}</td>
+            <td><button class="row-download" ${job.status === 'done' ? '' : 'disabled'} aria-label="Скачать"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v12M7.5 11.5 12 16l4.5-4.5M5 20h14"/></svg></button></td>
+          `;
+
+          if (job.status === 'done') {
+            row.querySelector('.row-download').addEventListener('click', () => {
+              downloadFile(job.id, 'txt', `job_${job.id}`);
+            });
+          }
+
+          historyBody.appendChild(row);
+
+          // Mobile card
+          const card = document.createElement('article');
+          card.className = 'mobile-history-card';
+          card.setAttribute('data-job-id', job.id);
+          card.innerHTML = `
+            <div class="mobile-history-top">
+              <div class="mini-file-icon">${iconAudio}</div>
+              <div>
+                <div class="history-file-name">Job #${job.id}</div>
+                <div class="history-file-meta">${job.time_ago} · ${job.mode}</div>
+              </div>
+            </div>
+            <div class="mobile-history-meta">
+              <span class="type-chip">${modeLabel}</span>
+              <button class="row-download" ${job.status === 'done' ? '' : 'disabled'} aria-label="Скачать"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v12M7.5 11.5 12 16l4.5-4.5M5 20h14"/></svg></button>
+            </div>
+          `;
+
+          if (job.status === 'done') {
+            card.querySelector('.row-download').addEventListener('click', () => {
+              downloadFile(job.id, 'txt', `job_${job.id}`);
+            });
+          }
+
+          mobileHistory.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Error loading history:', error);
+      }
+    }
+
+    // Load history when page loads
+    // History loading disabled due to routing issues
+    // document.addEventListener('DOMContentLoaded', loadHistory);
+    // setInterval(loadHistory, 30000);
   </script>
 </body>
 </html>

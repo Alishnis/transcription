@@ -36,14 +36,8 @@ if (!in_array($ext, $allowed, true)) {
 }
 
 $language = $_POST['language'] ?? 'auto';
-if (!in_array($language, ['ru', 'kz', 'auto'], true)) {
+if (!in_array($language, ['ru', 'kz', 'en', 'auto'], true)) {
     $language = 'auto';
-}
-
-// Engine choice matters only for kz/ru (auto is always Gemini)
-$engine = $_POST['engine'] ?? 'mangisoz';
-if (!in_array($engine, ['mangisoz', 'gemini'], true)) {
-    $engine = 'mangisoz';
 }
 
 $uploadsDir = STORAGE_PATH . '/uploads';
@@ -61,13 +55,13 @@ if (!move_uploaded_file($_FILES['file']['tmp_name'], $destPath)) {
 try {
     $db    = new Database(DB_PATH);
     $jobId = $db->createJob(0, 0, $destPath, '', 0);
-    $db->updateJob($jobId, ['language' => $language, 'engine' => $engine, 'status_message' => 'Файл загружен']);
+    $db->updateJob($jobId, ['language' => $language, 'status_message' => 'Файл загружен']);
 
     $workerScript = dirname(__DIR__, 2) . '/worker.php';
     $cmd = 'php ' . escapeshellarg($workerScript) . ' ' . $jobId . ' > /dev/null 2>&1 &';
     exec($cmd);
 
-    echo json_encode(['id' => $jobId, 'status' => 'uploaded']);
+    echo json_encode(['job_id' => $jobId, 'status' => 'processing']);
 } catch (Throwable $e) {
     @unlink($destPath);
     error_log('[upload.php] ' . $e->getMessage());

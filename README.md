@@ -54,6 +54,7 @@ http://localhost:8000/
 ✅ Whole-file speaker correction  
 ✅ Mobile responsive UI  
 ✅ Processing history  
+✅ Gemini AI powered transcription  
 
 ## File Structure
 

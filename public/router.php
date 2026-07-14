@@ -10,6 +10,7 @@ $map = [
     'download'   => '/api/download.php',
     'status'     => '/api/status.php',
     'upload'     => '/api/upload.php',
+    'history'    => '/api/history.php',
 ];
 
 // Check if it's an API request

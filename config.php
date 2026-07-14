@@ -17,9 +17,7 @@ if (file_exists($envFile)) {
     }
 }
 
-define('BOT_TOKEN',        $_ENV['BOT_TOKEN']        ?? '');
 define('GEMINI_API_KEY',   $_ENV['GEMINI_API_KEY']   ?? '');
-define('MANGISOZ_API_KEY', $_ENV['MANGISOZ_API_KEY'] ?? '');
 define('MODEL_API_URL',    $_ENV['MODEL_API_URL']    ?? 'http://65.21.210.122:8017');
 define('STORAGE_PATH',    __DIR__ . '/storage');
 define('DB_PATH',         STORAGE_PATH . '/bot.sqlite');
@@ -28,6 +26,5 @@ define('GEMINI_MODEL',    'gemini-1.5-flash');
 define('SUPPORTED_AUDIO', ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus']);
 define('SUPPORTED_VIDEO', ['mp4', 'mov']);
 
-define('CHUNK_DURATION',   300); // 5 minutes per chunk (Gemini)
-define('CHUNK_DURATION_KZ', 20); // chunk + overlap must stay < 28 s (Mangisoz internal limit)
+define('CHUNK_DURATION',   300); // 5 minutes per chunk
 define('CHUNK_OVERLAP',      5); // 5 seconds overlap between chunks

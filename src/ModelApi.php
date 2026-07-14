@@ -270,9 +270,7 @@ PROMPT;
 
     /**
      * Identify WHO is speaking WHEN in an audio clip, without transcribing
-     * text. Used to add real speaker diarization on top of engines (like
-     * Mangisoz) whose own STT output has no speaker information at all.
-     * Returns array of turns: [{start, end, speaker}], or [] if parsing fails
+     * text. Returns array of turns: [{start, end, speaker}], or [] if parsing fails
      * (diarization is a nice-to-have — callers must degrade gracefully).
      */
     public function diarize(string $fileUrl, string $mimeType): array

@@ -69,7 +69,6 @@ sudo -u deploy cp .env.example .env
 # Edit .env with actual values:
 # - MODEL_API_URL
 # - GEMINI_API_KEY (if using)
-# - MANGISOZ_API_KEY
 ```
 
 #### Setup Docker Compose:

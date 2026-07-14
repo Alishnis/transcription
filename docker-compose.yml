@@ -11,7 +11,6 @@ services:
     environment:
       - MODEL_API_URL=${MODEL_API_URL:-http://65.21.210.122:8017}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - MANGISOZ_API_KEY=${MANGISOZ_API_KEY:-}
     ports:
       - "9000:9000"
     restart: unless-stopped
@@ -40,7 +39,6 @@ services:
     environment:
       - MODEL_API_URL=${MODEL_API_URL:-http://65.21.210.122:8017}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - MANGISOZ_API_KEY=${MANGISOZ_API_KEY:-}
     command: tail -f /dev/null  # Keep running, worker.php invoked by API
     restart: unless-stopped
     depends_on:
