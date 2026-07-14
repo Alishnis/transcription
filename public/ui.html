@@ -1264,11 +1264,13 @@
       let pollCount = 0;
       const maxPolls = 1200; // 10 minutes at 0.5s interval
 
-      // Show progress bar and cancel button
-      progressContainer.style.display = 'block';
-      cancelButton.style.display = 'inline-flex';
-      resultTitle.textContent = 'Обработка...';
-      resultCheck.style.color = '#7157ff';
+      // Show progress bar and cancel button only if this is the current job
+      if (jobId === currentJobId) {
+        progressContainer.style.display = 'block';
+        cancelButton.style.display = 'inline-flex';
+        resultTitle.textContent = 'Обработка...';
+        resultCheck.style.color = '#7157ff';
+      }
 
       while (pollCount < maxPolls) {
         try {
@@ -1277,60 +1279,80 @@
 
           const data = await res.json();
 
-          // Update progress bar
-          const progress = data.progress || 0;
-          progressBar.style.width = progress + '%';
-          progressPercent.textContent = progress + '%';
+          // Update progress bar only for current job
+          if (jobId === currentJobId) {
+            const progress = data.progress || 0;
+            progressBar.style.width = progress + '%';
+            progressPercent.textContent = progress + '%';
+          }
 
-          // Update status in table
-          const statusChip = tableRow.querySelector('[data-status]');
-          if (statusChip) {
-            statusChip.textContent = data.message || data.status;
+          // Update status in table if row still exists
+          if (tableRow && tableRow.parentNode) {
+            const statusChip = tableRow.querySelector('[data-status]');
+            if (statusChip) {
+              statusChip.textContent = data.message || data.status;
+            }
           }
 
           if (data.status === 'done') {
-            // Hide progress and cancel button
-            progressContainer.style.display = 'none';
-            cancelButton.style.display = 'none';
-            progressBar.style.width = '100%';
-            progressPercent.textContent = '100%';
+            // Only update UI if this is the current job
+            if (jobId === currentJobId) {
+              // Hide progress and cancel button
+              progressContainer.style.display = 'none';
+              cancelButton.style.display = 'none';
+              progressBar.style.width = '100%';
+              progressPercent.textContent = '100%';
 
-            // Update result card
-            resultTitle.textContent = 'Файл готов';
-            resultCheck.style.color = 'var(--success)';
-
-            // Update status chips to "Готово"
-            const statusChipTable = tableRow.querySelector('[data-status]');
-            if (statusChipTable) {
-              statusChipTable.innerHTML = '<span class="status-chip">✓ Готово</span>';
+              // Update result card
+              resultTitle.textContent = 'Файл готов';
+              resultCheck.style.color = 'var(--success)';
             }
 
-            const statusChipMobile = mobileCard.querySelector('[data-status]');
-            if (statusChipMobile) {
-              statusChipMobile.innerHTML = '<span class="status-chip">✓ Готово</span>';
+            // Update status chips to "Готово" only if elements exist
+            if (tableRow && tableRow.parentNode) {
+              const statusChipTable = tableRow.querySelector('[data-status]');
+              if (statusChipTable) {
+                statusChipTable.innerHTML = '<span class="status-chip">✓ Готово</span>';
+              }
+
+              const dlBtn = tableRow.querySelector('.row-download');
+              if (dlBtn) {
+                dlBtn.disabled = false;
+                dlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
+              }
             }
 
-            // Enable download button
-            const dlBtn = tableRow.querySelector('.row-download');
-            if (dlBtn) {
-              dlBtn.disabled = false;
-              dlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
-            }
+            if (mobileCard && mobileCard.parentNode) {
+              const statusChipMobile = mobileCard.querySelector('[data-status]');
+              if (statusChipMobile) {
+                statusChipMobile.innerHTML = '<span class="status-chip">✓ Готово</span>';
+              }
 
-            const mobileDlBtn = mobileCard.querySelector('.row-download');
-            if (mobileDlBtn) {
-              mobileDlBtn.disabled = false;
-              mobileDlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
+              const mobileDlBtn = mobileCard.querySelector('.row-download');
+              if (mobileDlBtn) {
+                mobileDlBtn.disabled = false;
+                mobileDlBtn.onclick = () => downloadFile(jobId, 'txt', selectedFile.name);
+              }
             }
             break;
           }
 
           if (data.status === 'failed') {
-            progressContainer.style.display = 'none';
-            cancelButton.style.display = 'none';
-            resultTitle.textContent = 'Ошибка обработки';
-            resultCheck.style.color = '#d64545';
-            statusChip.textContent = 'Ошибка: ' + (data.error || 'Unknown error');
+            // Only update UI if this is the current job
+            if (jobId === currentJobId) {
+              progressContainer.style.display = 'none';
+              cancelButton.style.display = 'none';
+              resultTitle.textContent = 'Ошибка обработки';
+              resultCheck.style.color = '#d64545';
+            }
+
+            // Update table status if row exists
+            if (tableRow && tableRow.parentNode) {
+              const statusChip = tableRow.querySelector('[data-status]');
+              if (statusChip) {
+                statusChip.textContent = 'Ошибка: ' + (data.error || 'Unknown error');
+              }
+            }
             break;
           }
 
